@@ -1,9 +1,10 @@
 #include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <Wire.h>
-#include <LiquidCrystal_I2C.h>
+#include <ArduinoJson.h>
 
 // variable to store all the HTML code (HTML, JS, CSS)
 
@@ -283,10 +284,12 @@ char *resource = "";
 
 unsigned long lastTime = 0;
 
+
 String sensorReadings;
 float SensorReadingsArray[3];
 
 ESP8266WebServer serverWeb(80); // PORT OF WEB SERVER
+StaticJsonDocument<200> doc;
 
 
 void handleRoot() // Function that handles the root page of the web server
@@ -350,20 +353,27 @@ void setup() {
 
     serverWeb.on("/", handleRoot);
     serverWeb.onNotFound(handleNotFound);
-
+    
     serverWeb.begin();
 }
 
 
-void loop() (
+void loop() {
     serverWeb.handleClient();               // Handle WEB SERVER connections
 
     if (millis() - lastTime > 1000) {
         lastTime = millis();
-        resource = "/emeter/0";
-        sensorReadings = httpGETRequest(server + resource);
+        resource = "http://192.168.0.230/emeter/0";
+        sensorReadings = httpGETRequest(resource);
         Serial.println(sensorReadings);
-        JSONVAR readings = JSON.parse(sensorReadings);
-        Serial.println(readings);
+        DeserializationError error = deserializeJson(doc, sensorReadings);
+        if (error) {
+            Serial.print(F("deserializeJson() failed: "));
+            Serial.println(error.f_str());
+            return;
+        }
+        const char* power = doc["power"];
+        Serial.println(power);
 
-)
+    }
+}
