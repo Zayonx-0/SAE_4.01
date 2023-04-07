@@ -271,17 +271,20 @@ function getSpeed() {
 
 #ifndef STASSID
 #define STASSID "tp5&6"   // Network SSID
-#define STAPSK "" // Network Password
+#define STAPSK "geii2021" // Network Password
 #endif
 
 
 const char *ssid = STASSID; // Network SSID
 const char *password = STAPSK; // Network Password
 
-const char *server = "http://192.168.0.230"
-char *resource = "/relay/0"
-const unsigned long HTTP_TIMEOUT = 10000; // Timeout for HTTP requests
-const size_t MAX_CONTENT_SIZE = 512; // Maximum size of the file to download
+const char *server = "http://192.168.0.230";
+char *resource = "";
+
+unsigned long lastTime = 0;
+
+String sensorReadings;
+float SensorReadingsArray[3];
 
 ESP8266WebServer serverWeb(80); // PORT OF WEB SERVER
 
@@ -297,73 +300,34 @@ void handleNotFound() // Function that handles the error page of the web server 
     serverWeb.send(404, "text/html", message);
 }
 
-
-bool connect(const char* hostName) {
-  Serial.print("Connect to ");
-  Serial.println(hostName);
-
-  bool ok = client.connect(hostName, 80);
-
-  Serial.println(ok ? "Connected" : "Connection Failed!");
-  return ok;
-}
-
-bool sendRequest(const char* host, const char* resource) {
-  Serial.print("GET ");
-  Serial.println(resource);
-
-  client.print("GET ");
-  client.print(resource);
-  client.println(" HTTP/1.1");
-  client.print("Host: ");
-  client.println(host);
-  client.println("Connection: close");
-  client.println();
-
-  return true;
-}
-
-bool skipResponseHeaders() {
-  // HTTP headers end with an empty line
-  char endOfHeaders[] = "\r\n\r\n";
-
-  client.setTimeout(HTTP_TIMEOUT);
-  bool ok = client.find(endOfHeaders);
-
-  if (!ok) {
-    Serial.println("No response or invalid response!");
+String httpGETRequest(const char* serverName) {
+  WiFiClient client;
+  HTTPClient http;
+    
+  // Your IP address with path or Domain name with URL path 
+  http.begin(client, serverName);
+  
+  // If you need Node-RED/server authentication, insert user and password below
+  //http.setAuthorization("REPLACE_WITH_SERVER_USERNAME", "REPLACE_WITH_SERVER_PASSWORD");
+  
+  // Send HTTP POST request
+  int httpResponseCode = http.GET();
+  
+  String payload = "{}"; 
+  
+  if (httpResponseCode>0) {
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+    payload = http.getString();
   }
-  return ok;
-}
-
-bool readReponseContent(struct clientData* clientData) {
-  // Compute optimal size of the JSON buffer according to what we need to parse.
-  // See https://bblanchon.github.io/ArduinoJson/assistant/
-  const size_t bufferSize = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(1) + 
-      2*JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(4) + JSON_OBJECT_SIZE(5) + 
-      JSON_OBJECT_SIZE(6) + JSON_OBJECT_SIZE(12) + 390;
-  DynamicJsonBuffer jsonBuffer(bufferSize);
-
-  JsonObject& root = jsonBuffer.parseObject(client);
-
-  if (!root.success()) {
-    Serial.println("JSON parsing failed!");
-    return false;
+  else {
+    Serial.print("Error code: ");
+    Serial.println(httpResponseCode);
   }
+  // Free resources
+  http.end();
 
-  // Here were copy the strings we're interested in using to your struct data
-  strcpy(clientData->power, root["power"]);
-  strcpy(clientData->voltage, root["voltage"]);
-  // It's not mandatory to make a copy, you could just use the pointers
-  // Since, they are pointing inside the "content" buffer, so you need to make
-  // sure it's still in memory when you read the string
-
-  return true;
-}
-
-void disconnect() {
-  Serial.println("Disconnect");
-  client.stop();
+  return payload;
 }
 
 
@@ -393,16 +357,13 @@ void setup() {
 
 void loop() (
     serverWeb.handleClient();               // Handle WEB SERVER connections
-    if (connect(server)) {
-        if (sendRequest(server, resource) && skipResponseHeaders()) {
-            clientData ClientData;
-            if (readReponseContent(&clientData)) {
-                Serial.print("Power: ");
-                Serial.println(clientData.power);
-                Serial.print("voltage: ");
-                Serial.println(clientData.voltage);
-            }
-        }
-    }
+
+    if (millis() - lastTime > 1000) {
+        lastTime = millis();
+        resource = "/emeter/0";
+        sensorReadings = httpGETRequest(server + resource);
+        Serial.println(sensorReadings);
+        JSONVAR readings = JSON.parse(sensorReadings);
+        Serial.println(readings);
 
 )
