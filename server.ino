@@ -8,6 +8,11 @@
 
 // variable to store all the HTML code (HTML, JS, CSS)
 
+
+// TODO : Concerning HTML, we have to retrieve data from the server (power, voltage, Maybe consumption ? (for improvement))
+// --> Get the sign of the difference of the two channel to determine whether we are producing or consuming
+// --> Request from HTML to SERVER via http, server will be the one processing everything, html will only be interface refreshed by Server
+
 const char webpage[] PROGMEM = R"=====(
 <!DOCTYPE html>
 <html>
@@ -289,7 +294,8 @@ String sensorReadings;
 float SensorReadingsArray[3];
 
 ESP8266WebServer serverWeb(80); // PORT OF WEB SERVER
-StaticJsonDocument<200> doc;
+StaticJsonDocument<200> channel1Data;
+StaticJsonDocument<200> channel2Data;
 
 
 void handleRoot() // Function that handles the root page of the web server
@@ -363,17 +369,22 @@ void loop() {
 
     if (millis() - lastTime > 1000) {
         lastTime = millis();
-        resource = "http://192.168.0.230/emeter/0";
-        sensorReadings = httpGETRequest(resource);
-        Serial.println(sensorReadings);
-        DeserializationError error = deserializeJson(doc, sensorReadings);
+        channel1 = "http://192.168.0.230/emeter/0";
+        channel2 = "http://192.168.0.230/emeter/1"
+        Request = httpGETRequest(channel1);
+        Serial.println(Request);
+        DeserializationError error = deserializeJson(channel1Data, Request);
         if (error) {
             Serial.print(F("deserializeJson() failed: "));
             Serial.println(error.f_str());
             return;
         }
         const char* power = doc["power"];
+        const char* voltage = doc["voltage"];
+        Serial.print("Power: ");
         Serial.println(power);
+        Serial.print("Voltage: ");
+        Serial.println(voltage);
 
     }
 }
